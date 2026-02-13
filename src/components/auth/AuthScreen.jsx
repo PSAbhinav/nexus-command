@@ -3,177 +3,166 @@ import { setupAccount, verifyPassword, hasAccount, getAccountEmail, getPasswordS
 import { Shield, Eye, EyeOff, Lock, Mail, ArrowRight, BarChart3, Target, Zap, Heart } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
-    const [mode, setMode] = useState(hasAccount() ? 'login' : 'register');
-    const [email, setEmail] = useState(hasAccount() ? getAccountEmail() : '');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState(hasAccount() ? 'login' : 'register');
+  const [email, setEmail] = useState(hasAccount() ? getAccountEmail() : '');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const strength = getPasswordStrength(password);
+  const strength = getPasswordStrength(password);
 
-    const handleLogin = useCallback((e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        setTimeout(() => {
-            const key = verifyPassword(password);
-            if (key) onAuthenticated(key);
-            else setError('Invalid password. Please try again.');
-            setLoading(false);
-        }, 500);
-    }, [password, onAuthenticated]);
+  const handleLogin = useCallback((e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    setTimeout(() => {
+      const key = verifyPassword(password);
+      if (key) onAuthenticated(key);
+      else setError('Invalid password. Please try again.');
+      setLoading(false);
+    }, 500);
+  }, [password, onAuthenticated]);
 
-    const handleRegister = useCallback((e) => {
-        e.preventDefault();
-        setError('');
-        if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
-        if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
-        if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-        setLoading(true);
-        setTimeout(() => {
-            const key = setupAccount(email, password);
-            onAuthenticated(key);
-            setLoading(false);
-        }, 500);
-    const handleRegister = useCallback((e) => {
-        e.preventDefault();
-        setError('');
-        if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
-        if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
-        if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-        setLoading(true);
-        setTimeout(() => {
-            const key = setupAccount(email, password);
-            onAuthenticated(key);
-            setLoading(false);
-        }, 500);
-    }, [email, password, confirmPassword, onAuthenticated]);
 
-    const handleReset = useCallback(() => {
-        if (window.confirm('Are you sure? This will DELETE ALL DATA permanently. You cannot undo this.')) {
-            deleteAccount();
-            setMode('register');
-            setEmail('');
-            setPassword('');
-            setError('');
-        }
-    }, []);
+  const handleRegister = useCallback((e) => {
+    e.preventDefault();
+    setError('');
+    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    setTimeout(() => {
+      const key = setupAccount(email, password);
+      onAuthenticated(key);
+      setLoading(false);
+    }, 500);
+  }, [email, password, confirmPassword, onAuthenticated]);
 
-    const features = [
-        { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
-        { icon: <Target size={18} />, title: 'Goals & Habits', desc: 'Track streaks & milestones' },
-        { icon: <Zap size={18} />, title: 'Productivity', desc: 'Tasks, focus timer & more' },
-        { icon: <Heart size={18} />, title: 'Health Metrics', desc: 'Wellness & fitness tracking' }
-    ];
+  const handleReset = useCallback(() => {
+    if (window.confirm('Are you sure? This will DELETE ALL DATA permanently. You cannot undo this.')) {
+      deleteAccount();
+      setMode('register');
+      setEmail('');
+      setPassword('');
+      setError('');
+    }
+  }, []);
 
-    return (
-        <div className="auth-screen">
-            <div className="auth-container">
-                {/* Left side — Branding */}
-                <div className="auth-left">
-                    <div className="auth-brand">
-                        <div className="auth-logo"><Shield size={24} strokeWidth={2.5} /></div>
-                        <h1 className="auth-title">NexusCommand</h1>
-                        <p className="auth-tagline">Your encrypted personal command center</p>
-                    </div>
+  const features = [
+    { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
+    { icon: <Target size={18} />, title: 'Goals & Habits', desc: 'Track streaks & milestones' },
+    { icon: <Zap size={18} />, title: 'Productivity', desc: 'Tasks, focus timer & more' },
+    { icon: <Heart size={18} />, title: 'Health Metrics', desc: 'Wellness & fitness tracking' }
+  ];
 
-                    <div className="auth-features">
-                        {features.map((f, i) => (
-                            <div key={i} className="auth-feature" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
-                                <div className="auth-feature__icon">{f.icon}</div>
-                                <div>
-                                    <div className="auth-feature__title">{f.title}</div>
-                                    <div className="auth-feature__desc">{f.desc}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+  return (
+    <div className="auth-screen">
+      <div className="auth-container">
+        {/* Left side — Branding */}
+        <div className="auth-left">
+          <div className="auth-brand">
+            <div className="auth-logo"><Shield size={24} strokeWidth={2.5} /></div>
+            <h1 className="auth-title">NexusCommand</h1>
+            <p className="auth-tagline">Your encrypted personal command center</p>
+          </div>
 
-                    <div className="auth-security-note">
-                        <Lock size={13} />
-                        <span>AES-256 encryption · Data never leaves your device</span>
-                    </div>
+          <div className="auth-features">
+            {features.map((f, i) => (
+              <div key={i} className="auth-feature" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
+                <div className="auth-feature__icon">{f.icon}</div>
+                <div>
+                  <div className="auth-feature__title">{f.title}</div>
+                  <div className="auth-feature__desc">{f.desc}</div>
                 </div>
+              </div>
+            ))}
+          </div>
 
-                {/* Right side — Form */}
-                <div className="auth-right">
-                    <div className="auth-form-card card card--static">
-                        <h2 className="auth-form-title">
-                            {mode === 'login' ? 'Welcome back' : 'Create your vault'}
-                        </h2>
-                        <p className="auth-form-subtitle">
-                            {mode === 'login' ? 'Enter your password to unlock' : 'Set up your encrypted command center'}
-                        </p>
+          <div className="auth-security-note">
+            <Lock size={13} />
+            <span>AES-256 encryption · Data never leaves your device</span>
+          </div>
+        </div>
 
-                        <form onSubmit={mode === 'login' ? handleLogin : handleRegister}>
-                            {mode === 'register' && (
-                                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                                    <label className="input-label">Email</label>
-                                    <div className="input-with-icon">
-                                        <Mail size={15} className="input-icon" />
-                                        <input type="email" className="input-field input-field--icon" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                                    </div>
-                                </div>
-                            )}
+        {/* Right side — Form */}
+        <div className="auth-right">
+          <div className="auth-form-card card card--static">
+            <h2 className="auth-form-title">
+              {mode === 'login' ? 'Welcome back' : 'Create your vault'}
+            </h2>
+            <p className="auth-form-subtitle">
+              {mode === 'login' ? 'Enter your password to unlock' : 'Set up your encrypted command center'}
+            </p>
 
-                            {mode === 'login' && (
-                                <div className="auth-user-info"><Mail size={13} /><span>{email}</span></div>
-                            )}
-
-                            <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                                <label className="input-label">Password</label>
-                                <div className="input-with-icon">
-                                    <Lock size={15} className="input-icon" />
-                                    <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-                                    <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                                    </button>
-                                </div>
-                                {mode === 'register' && password && (
-                                    <div className="password-strength">
-                                        <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
-                                        <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {mode === 'register' && (
-                                <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                                    <label className="input-label">Confirm Password</label>
-                                    <div className="input-with-icon">
-                                        <Lock size={15} className="input-icon" />
-                                        <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Confirm your password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
-                                    </div>
-                                </div>
-                            )}
-
-                            {error && <div className="auth-error">{error}</div>}
-
-                            <button type="submit" className="btn btn-primary btn-lg auth-submit" disabled={loading}>
-                                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : 'Create Vault'}<ArrowRight size={16} /></>}
-                            </button>
-                        </form>
-
-                        <div className="auth-switch">
-                            {mode === 'login'
-                                ? <span>No account? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create one</button></span>
-                                : <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
-                            }
-                            {mode === 'login' && (
-                                <div style={{ marginTop: 'var(--space-md)' }}>
-                                    <button className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }} onClick={handleReset}>
-                                        Reset Vault / Forgot Password?
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+            <form onSubmit={mode === 'login' ? handleLogin : handleRegister}>
+              {mode === 'register' && (
+                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
+                  <label className="input-label">Email</label>
+                  <div className="input-with-icon">
+                    <Mail size={15} className="input-icon" />
+                    <input type="email" className="input-field input-field--icon" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                  </div>
                 </div>
+              )}
+
+              {mode === 'login' && (
+                <div className="auth-user-info"><Mail size={13} /><span>{email}</span></div>
+              )}
+
+              <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
+                <label className="input-label">Password</label>
+                <div className="input-with-icon">
+                  <Lock size={15} className="input-icon" />
+                  <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
+                  <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {mode === 'register' && password && (
+                  <div className="password-strength">
+                    <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
+                    <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
+                  </div>
+                )}
+              </div>
+
+              {mode === 'register' && (
+                <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
+                  <label className="input-label">Confirm Password</label>
+                  <div className="input-with-icon">
+                    <Lock size={15} className="input-icon" />
+                    <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Confirm your password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+                  </div>
+                </div>
+              )}
+
+              {error && <div className="auth-error">{error}</div>}
+
+              <button type="submit" className="btn btn-primary btn-lg auth-submit" disabled={loading}>
+                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : 'Create Vault'}<ArrowRight size={16} /></>}
+              </button>
+            </form>
+
+            <div className="auth-switch">
+              {mode === 'login'
+                ? <span>No account? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create one</button></span>
+                : <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
+              }
+              {mode === 'login' && (
+                <div style={{ marginTop: 'var(--space-md)' }}>
+                  <button className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }} onClick={handleReset}>
+                    Reset Vault / Forgot Password?
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
 
-            <style>{`
+      <style>{`
         .auth-screen {
           min-height: 100vh;
           display: flex;
@@ -380,6 +369,6 @@ export default function AuthScreen({ onAuthenticated }) {
           .auth-features { display: none; }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }
