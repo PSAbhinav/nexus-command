@@ -163,6 +163,9 @@ body {
   letter-spacing: -0.01em;
   overflow-x: hidden;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Animated aurora mesh background */
