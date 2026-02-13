@@ -381,26 +381,6 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
           .option-chips { flex-wrap: wrap; }
         }
       `}</style>
-        </div>
-    );
+            );
 }
 
-import { ErrorBoundary } from 'react-error-boundary';
-
-function ErrorFallback({ error, resetErrorBoundary }) {
-    return (
-        <div role="alert" style={{ padding: 20, background: '#331111', color: 'white' }}>
-            <p>Something went wrong:</p>
-            <pre style={{ color: 'red' }}>{error.message}</pre>
-            <button onClick={resetErrorBoundary}>Try again</button>
-        </div>
-    );
-}
-
-export default function SettingsModuleWrapper(props) {
-    return (
-        <ErrorBoundary FallbackComponent={ErrorFallback}>
-            <SettingsModule {...props} />
-        </ErrorBoundary>
-    );
-}
