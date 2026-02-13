@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportAllData, importData } from '../../utils/storage';
 import { getPasswordStrength } from '../../utils/encryption'; // Keeping strength meter for UI
@@ -381,5 +382,25 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
         }
       `}</style>
         </div>
+    );
+}
+
+import { ErrorBoundary } from 'react-error-boundary';
+
+function ErrorFallback({ error, resetErrorBoundary }) {
+    return (
+        <div role="alert" style={{ padding: 20, background: '#331111', color: 'white' }}>
+            <p>Something went wrong:</p>
+            <pre style={{ color: 'red' }}>{error.message}</pre>
+            <button onClick={resetErrorBoundary}>Try again</button>
+        </div>
+    );
+}
+
+export default function SettingsModuleWrapper(props) {
+    return (
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <SettingsModule {...props} />
+        </ErrorBoundary>
     );
 }
