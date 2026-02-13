@@ -1,9 +1,12 @@
 import { useState, useCallback } from 'react';
 import { setupAccount, verifyPassword, hasAccount, getAccountEmail, getPasswordStrength, deleteAccount } from '../../utils/encryption';
+import { importData } from '../../utils/storage';
 import { Shield, Eye, EyeOff, Lock, Mail, ArrowRight, BarChart3, Target, Zap, Heart } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState(hasAccount() ? 'login' : 'register');
+  const [importedData, setImportedData] = useState(null);
+
   const [email, setEmail] = useState(hasAccount() ? getAccountEmail() : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -16,14 +19,28 @@ export default function AuthScreen({ onAuthenticated }) {
   const handleLogin = useCallback((e) => {
     e.preventDefault();
     setError('');
+
+    // We no longer block login based on stored email mismatch, 
+    // as the user might be correcting a typo or the stored email might be missing.
+
     setLoading(true);
     setTimeout(() => {
       const key = verifyPassword(password);
-      if (key) onAuthenticated(key);
-      else setError('Invalid password. Please try again.');
+      if (key) {
+        // If login successful, ensure we update the stored email if it was missing/different
+        // This self-heals the "empty email in error" issue
+        const authData = JSON.parse(localStorage.getItem('nexus_cmd_auth') || '{}');
+        if (authData.email !== email) {
+          authData.email = email;
+          localStorage.setItem('nexus_cmd_auth', JSON.stringify(authData));
+        }
+        onAuthenticated(key);
+      } else {
+        setError('Invalid password. Please try again.');
+      }
       setLoading(false);
     }, 500);
-  }, [password, onAuthenticated]);
+  }, [email, password, onAuthenticated]);
 
 
   const handleRegister = useCallback((e) => {
@@ -79,6 +96,51 @@ export default function AuthScreen({ onAuthenticated }) {
     }
   }, [email, password, confirmPassword, onAuthenticated]);
 
+  const handleImportSubmit = useCallback((e) => {
+    e.preventDefault();
+    setError('');
+    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+
+    setLoading(true);
+    setTimeout(() => {
+      // 1. Create new account with provided credentials
+      const key = setupAccount(email, password);
+
+      // 2. Import the data using the new key
+      if (importedData && importData(importedData, key)) {
+        onAuthenticated(key);
+      } else {
+        setError('Failed to import vault data. File might be corrupted.');
+        deleteAccount(); // Cleanup if failed
+      }
+      setLoading(false);
+    }, 500);
+  }, [email, password, confirmPassword, importedData, onAuthenticated]);
+
+  const handleFileImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target.result);
+        if (json.version && json.data) {
+          setImportedData(json);
+          setMode('import_vault');
+          setError('');
+        } else {
+          setError('Invalid backup file format.');
+        }
+      } catch {
+        setError('Failed to parse backup file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const features = [
     { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
     { icon: <Target size={18} />, title: 'Goals & Habits', desc: 'Track streaks & milestones' },
@@ -119,14 +181,14 @@ export default function AuthScreen({ onAuthenticated }) {
         <div className="auth-right">
           <div className="auth-form-card card card--static">
             <h2 className="auth-form-title">
-              {mode === 'login' ? 'Welcome back' : mode === 'forgot_password' ? 'Reset Password' : 'Create your vault'}
+              {mode === 'login' ? 'Welcome back' : mode === 'forgot_password' ? 'Reset Password' : mode === 'import_vault' ? 'Secure Imported Vault' : 'Create your vault'}
             </h2>
             <p className="auth-form-subtitle">
-              {mode === 'login' ? 'Enter your password to unlock' : mode === 'forgot_password' ? 'Secure password recovery' : 'Set up your encrypted command center'}
+              {mode === 'login' ? 'Enter your password to unlock' : mode === 'forgot_password' ? 'Secure password recovery' : mode === 'import_vault' ? 'Set credentials for your imported data' : 'Set up your encrypted command center'}
             </p>
 
-            <form onSubmit={mode === 'login' ? handleLogin : mode === 'forgot_password' ? handleNewPasswordSubmit : handleRegister}>
-              {mode === 'register' && (
+            <form onSubmit={mode === 'login' ? handleLogin : mode === 'forgot_password' ? handleNewPasswordSubmit : mode === 'import_vault' ? handleImportSubmit : handleRegister}>
+              {(mode === 'register' || mode === 'import_vault') && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
                   <label className="input-label">Email</label>
                   <div className="input-with-icon">
@@ -137,14 +199,15 @@ export default function AuthScreen({ onAuthenticated }) {
               )}
 
               {mode === 'login' && (
-                <div className="auth-user-info">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flex: 1 }}>
-                    <Mail size={13} />
-                    <span>{email}</span>
+                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
+                  <label className="input-label">Email</label>
+                  <div className="input-with-icon">
+                    <Mail size={15} className="input-icon" />
+                    <input type="email" className="input-field input-field--icon" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
                   </div>
-                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-xs)' }} onClick={() => { setMode('register'); setEmail(''); }}>
-                    Change
-                  </button>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Check email spelling carefully. This vault is tied to a specific email.
+                  </div>
                 </div>
               )}
 
@@ -176,7 +239,7 @@ export default function AuthScreen({ onAuthenticated }) {
                 </>
               )}
 
-              {(mode === 'login' || mode === 'register') && (
+              {(mode === 'login' || mode === 'register' || mode === 'import_vault') && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
                   <label className="input-label">Password</label>
                   <div className="input-with-icon">
@@ -186,7 +249,7 @@ export default function AuthScreen({ onAuthenticated }) {
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                  {mode === 'register' && password && (
+                  {(mode === 'register' || mode === 'import_vault') && password && (
                     <div className="password-strength">
                       <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
                       <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
@@ -195,7 +258,7 @@ export default function AuthScreen({ onAuthenticated }) {
                 </div>
               )}
 
-              {mode === 'register' && (
+              {(mode === 'register' || mode === 'import_vault') && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
                   <label className="input-label">Confirm Password</label>
                   <div className="input-with-icon">
@@ -208,8 +271,9 @@ export default function AuthScreen({ onAuthenticated }) {
               {error && <div className="auth-error">{error}</div>}
 
               <button type="submit" className="btn btn-primary btn-lg auth-submit" disabled={loading}>
-                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : mode === 'forgot_password' ? 'Set New Password' : 'Create Vault'}<ArrowRight size={16} /></>}
+                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : mode === 'forgot_password' ? 'Set New Password' : mode === 'import_vault' ? 'Secure & Import' : 'Create Vault'}<ArrowRight size={16} /></>}
               </button>
+
             </form>
             <div className="auth-switch">
               {mode === 'login' && (
@@ -228,8 +292,25 @@ export default function AuthScreen({ onAuthenticated }) {
               )}
 
               {mode === 'register' && (
-                <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', marginTop: 'var(--space-lg)' }}>
+                  <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
+
+                  <div style={{ position: 'relative', marginTop: 'var(--space-sm)' }}>
+                    <div style={{ borderTop: '1px solid var(--border)', position: 'absolute', top: '50%', left: 0, right: 0 }}></div>
+                    <span style={{ position: 'relative', background: 'var(--bg-elevated)', padding: '0 10px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>OR</span>
+                  </div>
+
+                  <label className="btn btn-secondary auth-submit" style={{ cursor: 'pointer', marginTop: 0 }}>
+                    Import Vault File
+                    <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileImport} />
+                  </label>
+                </div>
               )}
+
+              {mode === 'import_vault' && (
+                <button className="auth-link" style={{ marginTop: 'var(--space-md)' }} onClick={() => setMode('register')}>Cancel Import</button>
+              )}
+
             </div>
           </div>
         </div>
