@@ -381,6 +381,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
           .option-chips { flex-wrap: wrap; }
         }
       `}</style>
-            );
+        </div>
+    );
 }
 
