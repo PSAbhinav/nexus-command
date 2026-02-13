@@ -40,15 +40,44 @@ export default function AuthScreen({ onAuthenticated }) {
     }, 500);
   }, [email, password, confirmPassword, onAuthenticated]);
 
-  const handleReset = useCallback(() => {
-    if (window.confirm('Are you sure? This will DELETE ALL DATA permanently. You cannot undo this.')) {
+  const [resetStep, setResetStep] = useState(0); // 0: idle, 1: email sent, 2: new password
+
+  // Reset Vault (Explicit Data Wipe)
+  const handleResetVault = useCallback(() => {
+    if (window.confirm('⚠️ DANGER: This will PERMANENTLY DELETE all your encrypted data. You cannot undo this.\n\nAre you sure you want to reset your vault?')) {
       deleteAccount();
       setMode('register');
       setEmail('');
       setPassword('');
       setError('');
+      window.location.reload();
     }
   }, []);
+
+  // Forgot Password Flow (Simulated Email)
+  const handleForgotPassword = useCallback(() => {
+    if (!email) { setError('Please enter your email first.'); return; }
+    setMode('forgot_password');
+    setResetStep(1);
+    // Simulate email sending
+    setTimeout(() => {
+      alert(`🔗 Simulation: A password reset link has been sent to ${email}.\n\n(In this demo, click OK to simulate clicking the link)`);
+      setResetStep(2);
+    }, 1500);
+  }, [email]);
+
+  // Handle New Password (Reset)
+  const handleNewPasswordSubmit = useCallback((e) => {
+    e.preventDefault();
+    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+
+    if (window.confirm('Notice: Since this is a local-first encrypted vault, resetting your password without the old one means pre-existing data cannot be decrypted and will be cleared.\n\nProceed with reset?')) {
+      deleteAccount(); // We must wipe data as we can't decrypt it
+      const key = setupAccount(email, password);
+      onAuthenticated(key);
+    }
+  }, [email, password, confirmPassword, onAuthenticated]);
 
   const features = [
     { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
@@ -90,13 +119,13 @@ export default function AuthScreen({ onAuthenticated }) {
         <div className="auth-right">
           <div className="auth-form-card card card--static">
             <h2 className="auth-form-title">
-              {mode === 'login' ? 'Welcome back' : 'Create your vault'}
+              {mode === 'login' ? 'Welcome back' : mode === 'forgot_password' ? 'Reset Password' : 'Create your vault'}
             </h2>
             <p className="auth-form-subtitle">
-              {mode === 'login' ? 'Enter your password to unlock' : 'Set up your encrypted command center'}
+              {mode === 'login' ? 'Enter your password to unlock' : mode === 'forgot_password' ? 'Secure password recovery' : 'Set up your encrypted command center'}
             </p>
 
-            <form onSubmit={mode === 'login' ? handleLogin : handleRegister}>
+            <form onSubmit={mode === 'login' ? handleLogin : mode === 'forgot_password' ? handleNewPasswordSubmit : handleRegister}>
               {mode === 'register' && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
                   <label className="input-label">Email</label>
@@ -108,25 +137,63 @@ export default function AuthScreen({ onAuthenticated }) {
               )}
 
               {mode === 'login' && (
-                <div className="auth-user-info"><Mail size={13} /><span>{email}</span></div>
-              )}
-
-              <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                <label className="input-label">Password</label>
-                <div className="input-with-icon">
-                  <Lock size={15} className="input-icon" />
-                  <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-                  <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                <div className="auth-user-info">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flex: 1 }}>
+                    <Mail size={13} />
+                    <span>{email}</span>
+                  </div>
+                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-xs)' }} onClick={() => { setMode('register'); setEmail(''); }}>
+                    Change
                   </button>
                 </div>
-                {mode === 'register' && password && (
-                  <div className="password-strength">
-                    <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
-                    <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
+              )}
+
+              {mode === 'forgot_password' && resetStep === 2 && (
+                <>
+                  <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
+                    <label className="input-label">New Password</label>
+                    <div className="input-with-icon">
+                      <Lock size={15} className="input-icon" />
+                      <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter new password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
+                      <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {password && (
+                      <div className="password-strength">
+                        <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
+                        <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
+                    <label className="input-label">Confirm New Password</label>
+                    <div className="input-with-icon">
+                      <Lock size={15} className="input-icon" />
+                      <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {(mode === 'login' || mode === 'register') && (
+                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
+                  <label className="input-label">Password</label>
+                  <div className="input-with-icon">
+                    <Lock size={15} className="input-icon" />
+                    <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
+                    <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                  {mode === 'register' && password && (
+                    <div className="password-strength">
+                      <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
+                      <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {mode === 'register' && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
@@ -141,21 +208,27 @@ export default function AuthScreen({ onAuthenticated }) {
               {error && <div className="auth-error">{error}</div>}
 
               <button type="submit" className="btn btn-primary btn-lg auth-submit" disabled={loading}>
-                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : 'Create Vault'}<ArrowRight size={16} /></>}
+                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : mode === 'forgot_password' ? 'Set New Password' : 'Create Vault'}<ArrowRight size={16} /></>}
               </button>
             </form>
-
             <div className="auth-switch">
-              {mode === 'login'
-                ? <span>No account? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create one</button></span>
-                : <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
-              }
               {mode === 'login' && (
-                <div style={{ marginTop: 'var(--space-md)' }}>
-                  <button className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }} onClick={handleReset}>
-                    Reset Vault / Forgot Password?
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-sm)' }} onClick={handleForgotPassword}>
+                    Forgot Password?
+                  </button>
+                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', opacity: 0.8 }} onClick={handleResetVault}>
+                    Reset Vault (Delete Data)
                   </button>
                 </div>
+              )}
+
+              {mode === 'forgot_password' && (
+                <button className="auth-link" onClick={() => setMode('login')}>Back to Login</button>
+              )}
+
+              {mode === 'register' && (
+                <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
               )}
             </div>
           </div>
@@ -369,6 +442,6 @@ export default function AuthScreen({ onAuthenticated }) {
           .auth-features { display: none; }
         }
       `}</style>
-    </div>
+    </div >
   );
 }
