@@ -216,6 +216,31 @@ export default function GoalsModule({ data, onUpdate }) {
                     </div>
                 </ModalPortal>
             )}
+
+            <style>{`
+                .section-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: var(--space-xl);
+                }
+                @media (max-width: 768px) {
+                    .section-header {
+                        flex-direction: column;
+                        gap: var(--space-lg);
+                    }
+                    .section-header > div:first-child {
+                        margin-bottom: 0;
+                    }
+                    .section-header > div:last-child {
+                        width: 100%;
+                        justify-content: space-between;
+                    }
+                    .tabs {
+                        flex: 1;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
