@@ -1,528 +1,336 @@
-import { useState, useCallback } from 'react';
-import { setupAccount, verifyPassword, hasAccount, getAccountEmail, getPasswordStrength, deleteAccount } from '../../utils/encryption';
-import { importData } from '../../utils/storage';
-import { Shield, Eye, EyeOff, Lock, Mail, ArrowRight, BarChart3, Target, Zap, Heart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { Shield, Mail, ArrowRight, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState(hasAccount() ? 'login' : 'register');
-  const [importedData, setImportedData] = useState(null);
-
-  const [email, setEmail] = useState(hasAccount() ? getAccountEmail() : '');
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const strength = getPasswordStrength(password);
-
-  const handleLogin = useCallback((e) => {
-    e.preventDefault();
-    setError('');
-
-    // We no longer block login based on stored email mismatch, 
-    // as the user might be correcting a typo or the stored email might be missing.
-
-    setLoading(true);
-    setTimeout(() => {
-      const key = verifyPassword(password);
-      if (key) {
-        // If login successful, ensure we update the stored email if it was missing/different
-        // This self-heals the "empty email in error" issue
-        const authData = JSON.parse(localStorage.getItem('nexus_cmd_auth') || '{}');
-        if (authData.email !== email) {
-          authData.email = email;
-          localStorage.setItem('nexus_cmd_auth', JSON.stringify(authData));
-        }
-        onAuthenticated(key);
-      } else {
-        setError('Invalid password. Please try again.');
+  // Check for password recovery flow
+  useEffect(() => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('reset');
       }
-      setLoading(false);
-    }, 500);
-  }, [email, password, onAuthenticated]);
-
-
-  const handleRegister = useCallback((e) => {
-    e.preventDefault();
-    setError('');
-    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-    setLoading(true);
-    setTimeout(() => {
-      const key = setupAccount(email, password);
-      onAuthenticated(key);
-      setLoading(false);
-    }, 500);
-  }, [email, password, confirmPassword, onAuthenticated]);
-
-  const [resetStep, setResetStep] = useState(0); // 0: idle, 1: email sent, 2: new password
-
-  // Reset Vault (Explicit Data Wipe)
-  const handleResetVault = useCallback(() => {
-    if (window.confirm('⚠️ DANGER: This will PERMANENTLY DELETE all your encrypted data. You cannot undo this.\n\nAre you sure you want to reset your vault?')) {
-      deleteAccount();
-      setMode('register');
-      setEmail('');
-      setPassword('');
-      setError('');
-      window.location.reload();
-    }
+    });
   }, []);
 
-  // Forgot Password Flow (Simulated Email)
-  const handleForgotPassword = useCallback(() => {
-    if (!email) { setError('Please enter your email first.'); return; }
-    setMode('forgot_password');
-    setResetStep(1);
-    // Simulate email sending
-    setTimeout(() => {
-      alert(`🔗 Simulation: A password reset link has been sent to ${email}.\n\n(In this demo, click OK to simulate clicking the link)`);
-      setResetStep(2);
-    }, 1500);
-  }, [email]);
-
-  // Handle New Password (Reset)
-  const handleNewPasswordSubmit = useCallback((e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    setError(''); setSuccessMsg(''); setLoading(true);
 
-    if (window.confirm('Notice: Since this is a local-first encrypted vault, resetting your password without the old one means pre-existing data cannot be decrypted and will be cleared.\n\nProceed with reset?')) {
-      deleteAccount(); // We must wipe data as we can't decrypt it
-      const key = setupAccount(email, password);
-      onAuthenticated(key);
-    }
-  }, [email, password, confirmPassword, onAuthenticated]);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  const handleImportSubmit = useCallback((e) => {
-    e.preventDefault();
-    setError('');
-    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-
-    setLoading(true);
-    setTimeout(() => {
-      // 1. Create new account with provided credentials
-      const key = setupAccount(email, password);
-
-      // 2. Import the data using the new key
-      if (importedData && importData(importedData, key)) {
-        onAuthenticated(key);
-      } else {
-        setError('Failed to import vault data. File might be corrupted.');
-        deleteAccount(); // Cleanup if failed
-      }
-      setLoading(false);
-    }, 500);
-  }, [email, password, confirmPassword, importedData, onAuthenticated]);
-
-  const handleFileImport = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const json = JSON.parse(ev.target.result);
-        if (json.version && json.data) {
-          setImportedData(json);
-          setMode('import_vault');
-          setError('');
-        } else {
-          setError('Invalid backup file format.');
-        }
-      } catch {
-        setError('Failed to parse backup file.');
-      }
-    };
-    reader.readAsText(file);
+    if (error) { setError(error.message); setLoading(false); }
+    else { onAuthenticated(data.user); }
   };
 
-  const features = [
-    { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
-    { icon: <Target size={18} />, title: 'Goals & Habits', desc: 'Track streaks & milestones' },
-    { icon: <Zap size={18} />, title: 'Productivity', desc: 'Tasks, focus timer & more' },
-    { icon: <Heart size={18} />, title: 'Health Metrics', desc: 'Wellness & fitness tracking' }
-  ];
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError(''); setSuccessMsg('');
 
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    if (error) { setError(error.message); setLoading(false); }
+    else {
+      // Check if email confirmation is required (depends on Supabase settings)
+      if (data.user && !data.session) {
+        setSuccessMsg('Registration successful! Please check your email to confirm your account.');
+        setLoading(false);
+      } else {
+        onAuthenticated(data.user);
+      }
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!email) { setError('Please enter your email address.'); return; }
+
+    setLoading(true); setError(''); setSuccessMsg('');
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin, // Redirect back to app
+    });
+
+    if (error) { setError(error.message); }
+    else { setSuccessMsg('Password reset link sent! Check your inbox (valid for 5 mins).'); }
+    setLoading(false);
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (password.length < 6) { setError('New password must be at least 6 characters'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+
+    setLoading(true); setError('');
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) { setError(error.message); setLoading(false); }
+    else {
+      setSuccessMsg('Password updated successfully! You can now log in.');
+      setTimeout(() => { setMode('login'); setPassword(''); setConfirmPassword(''); setSuccessMsg(''); }, 2000);
+      setLoading(false);
+    }
+  };
+
+  // background animation
   return (
     <div className="auth-screen">
+      <div className="aurora-bg">
+        <div className="aurora-blob blob-1"></div>
+        <div className="aurora-blob blob-2"></div>
+        <div className="aurora-blob blob-3"></div>
+      </div>
+
       <div className="auth-container">
-        {/* Left side — Branding */}
-        <div className="auth-left">
-          <div className="auth-brand">
-            <div className="auth-logo"><Shield size={24} strokeWidth={2.5} /></div>
-            <h1 className="auth-title">NexusCommand</h1>
-            <p className="auth-tagline">Your encrypted personal command center</p>
+        <div className="auth-card">
+          {/* Header */}
+          <div className="auth-header">
+            <div className="logo-icon"><Shield size={28} /></div>
+            <h1 className="app-title">NexusCommand</h1>
+            <p className="app-tagline">Secure Cloud Command Center</p>
           </div>
 
-          <div className="auth-features">
-            {features.map((f, i) => (
-              <div key={i} className="auth-feature" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
-                <div className="auth-feature__icon">{f.icon}</div>
-                <div>
-                  <div className="auth-feature__title">{f.title}</div>
-                  <div className="auth-feature__desc">{f.desc}</div>
+          {/* Mode Title */}
+          <h2 className="auth-mode-title">
+            {mode === 'login' && 'Welcome Back'}
+            {mode === 'register' && 'Create Account'}
+            {mode === 'forgot' && 'Reset Password'}
+            {mode === 'reset' && 'Set New Password'}
+          </h2>
+
+          {/* Feedback Messages */}
+          {error && <div className="feedback error"><AlertCircle size={16} />{error}</div>}
+          {successMsg && <div className="feedback success"><CheckCircle2 size={16} />{successMsg}</div>}
+
+          {/* Form */}
+          <form onSubmit={
+            mode === 'login' ? handleLogin :
+              mode === 'register' ? handleRegister :
+                mode === 'forgot' ? handleForgotPassword :
+                  handleResetPassword
+          }>
+
+            {(mode === 'login' || mode === 'register' || mode === 'forgot') && (
+              <div className="input-group">
+                <label>Email Address</label>
+                <div className="input-field">
+                  <Mail size={18} className="icon" />
+                  <input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={mode === 'login'} />
                 </div>
               </div>
-            ))}
-          </div>
+            )}
 
-          <div className="auth-security-note">
-            <Lock size={13} />
-            <span>AES-256 encryption · Data never leaves your device</span>
-          </div>
-        </div>
-
-        {/* Right side — Form */}
-        <div className="auth-right">
-          <div className="auth-form-card card card--static">
-            <h2 className="auth-form-title">
-              {mode === 'login' ? 'Welcome back' : mode === 'forgot_password' ? 'Reset Password' : mode === 'import_vault' ? 'Secure Imported Vault' : 'Create your vault'}
-            </h2>
-            <p className="auth-form-subtitle">
-              {mode === 'login' ? 'Enter your password to unlock' : mode === 'forgot_password' ? 'Secure password recovery' : mode === 'import_vault' ? 'Set credentials for your imported data' : 'Set up your encrypted command center'}
-            </p>
-
-            <form onSubmit={mode === 'login' ? handleLogin : mode === 'forgot_password' ? handleNewPasswordSubmit : mode === 'import_vault' ? handleImportSubmit : handleRegister}>
-              {(mode === 'register' || mode === 'import_vault') && (
-                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                  <label className="input-label">Email</label>
-                  <div className="input-with-icon">
-                    <Mail size={15} className="input-icon" />
-                    <input type="email" className="input-field input-field--icon" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                  </div>
+            {(mode === 'login' || mode === 'register' || mode === 'reset') && (
+              <div className="input-group">
+                <label>{mode === 'reset' ? 'New Password' : 'Password'}</label>
+                <div className="input-field">
+                  <Lock size={18} className="icon" />
+                  <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <button type="button" className="toggle-pwd" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {mode === 'login' && (
-                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                  <label className="input-label">Email</label>
-                  <div className="input-with-icon">
-                    <Mail size={15} className="input-icon" />
-                    <input type="email" className="input-field input-field--icon" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                  </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Check email spelling carefully. This vault is tied to a specific email.
-                  </div>
+            {(mode === 'register' || mode === 'reset') && (
+              <div className="input-group">
+                <label>Confirm Password</label>
+                <div className="input-field">
+                  <Lock size={18} className="icon" />
+                  <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
                 </div>
-              )}
+              </div>
+            )}
 
-              {mode === 'forgot_password' && resetStep === 2 && (
+            {mode === 'login' && (
+              <div className="forgot-link">
+                <button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}>Forgot Password?</button>
+              </div>
+            )}
+
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? <div className="spinner"></div> : (
                 <>
-                  <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                    <label className="input-label">New Password</label>
-                    <div className="input-with-icon">
-                      <Lock size={15} className="input-icon" />
-                      <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter new password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-                      <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                    {password && (
-                      <div className="password-strength">
-                        <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
-                        <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                    <label className="input-label">Confirm New Password</label>
-                    <div className="input-with-icon">
-                      <Lock size={15} className="input-icon" />
-                      <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
-                    </div>
-                  </div>
+                  {mode === 'login' && 'Sign In'}
+                  {mode === 'register' && 'Create Account'}
+                  {mode === 'forgot' && 'Send Reset Link'}
+                  {mode === 'reset' && 'Update Password'}
+                  <ArrowRight size={18} />
                 </>
               )}
+            </button>
+          </form>
 
-              {(mode === 'login' || mode === 'register' || mode === 'import_vault') && (
-                <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                  <label className="input-label">Password</label>
-                  <div className="input-with-icon">
-                    <Lock size={15} className="input-icon" />
-                    <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-                    <button type="button" className="input-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                  {(mode === 'register' || mode === 'import_vault') && password && (
-                    <div className="password-strength">
-                      <div className="password-strength__bar"><div className="password-strength__fill" style={{ width: strength.width, background: strength.color }} /></div>
-                      <span className="password-strength__label" style={{ color: strength.color }}>{strength.level}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(mode === 'register' || mode === 'import_vault') && (
-                <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                  <label className="input-label">Confirm Password</label>
-                  <div className="input-with-icon">
-                    <Lock size={15} className="input-icon" />
-                    <input type={showPassword ? 'text' : 'password'} className="input-field input-field--icon" placeholder="Confirm your password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
-                  </div>
-                </div>
-              )}
-
-              {error && <div className="auth-error">{error}</div>}
-
-              <button type="submit" className="btn btn-primary btn-lg auth-submit" disabled={loading}>
-                {loading ? <span className="auth-spinner" /> : <>{mode === 'login' ? 'Unlock Dashboard' : mode === 'forgot_password' ? 'Set New Password' : mode === 'import_vault' ? 'Secure & Import' : 'Create Vault'}<ArrowRight size={16} /></>}
-              </button>
-
-            </form>
-            <div className="auth-switch">
-              {mode === 'login' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-sm)' }} onClick={handleForgotPassword}>
-                    Forgot Password?
-                  </button>
-                  <button type="button" className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', opacity: 0.8 }} onClick={handleResetVault}>
-                    Reset Vault (Delete Data)
-                  </button>
-                </div>
-              )}
-
-              {mode === 'forgot_password' && (
-                <button className="auth-link" onClick={() => setMode('login')}>Back to Login</button>
-              )}
-
-              {mode === 'register' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', marginTop: 'var(--space-lg)' }}>
-                  <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
-
-                  <div style={{ position: 'relative', marginTop: 'var(--space-sm)' }}>
-                    <div style={{ borderTop: '1px solid var(--border)', position: 'absolute', top: '50%', left: 0, right: 0 }}></div>
-                    <span style={{ position: 'relative', background: 'var(--bg-elevated)', padding: '0 10px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>OR</span>
-                  </div>
-
-                  <label className="btn btn-secondary auth-submit" style={{ cursor: 'pointer', marginTop: 0 }}>
-                    Import Vault File
-                    <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileImport} />
-                  </label>
-                </div>
-              )}
-
-              {mode === 'import_vault' && (
-                <button className="auth-link" style={{ marginTop: 'var(--space-md)' }} onClick={() => setMode('register')}>Cancel Import</button>
-              )}
-
-            </div>
+          {/* Footer Switch */}
+          <div className="auth-footer">
+            {mode === 'login' && (
+              <p>New to Nexus? <button onClick={() => { setMode('register'); setError(''); }}>Sign Up</button></p>
+            )}
+            {mode === 'register' && (
+              <p>Already have an account? <button onClick={() => { setMode('login'); setError(''); }}>Sign In</button></p>
+            )}
+            {(mode === 'forgot' || mode === 'reset') && (
+              <p><button onClick={() => { setMode('login'); setError(''); }}>Back to Login</button></p>
+            )}
           </div>
         </div>
       </div>
 
       <style>{`
-        .auth-screen {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: var(--space-xl);
-          background: var(--bg-primary);
-        }
-        .auth-container {
-          display: flex;
-          width: 100%;
-          max-width: 880px;
-          gap: var(--space-3xl);
-          align-items: center;
-          animation: fade-in 0.5s var(--ease-out);
-        }
-        .auth-left {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-xl);
-        }
-        .auth-logo {
-          width: 48px;
-          height: 48px;
-          border-radius: var(--radius-lg);
-          background: var(--accent);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          margin-bottom: var(--space-md);
-          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
-        }
-        .auth-title {
-          font-size: var(--text-3xl);
-          font-weight: 800;
-          color: var(--text-primary);
-          letter-spacing: -0.03em;
-          line-height: 1.1;
-        }
-        .auth-tagline {
-          color: var(--text-secondary);
-          font-size: var(--text-base);
-          margin-top: var(--space-sm);
-        }
-        .auth-features {
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-sm);
-        }
-        .auth-feature {
-          display: flex;
-          align-items: center;
-          gap: var(--space-md);
-          padding: var(--space-sm) 0;
-          animation: slide-up 0.4s var(--ease-out) both;
-        }
-        .auth-feature__icon {
-          width: 36px;
-          height: 36px;
-          border-radius: var(--radius-md);
-          background: var(--accent-subtle);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--accent-light);
-          flex-shrink: 0;
-        }
-        .auth-feature__title {
-          font-weight: 600;
-          font-size: var(--text-sm);
-          color: var(--text-primary);
-        }
-        .auth-feature__desc {
-          font-size: var(--text-xs);
-          color: var(--text-muted);
-        }
-        .auth-security-note {
-          display: flex;
-          align-items: center;
-          gap: var(--space-sm);
-          font-size: var(--text-xs);
-          color: var(--text-muted);
-          padding-top: var(--space-md);
-          border-top: 1px solid var(--border);
-        }
-        .auth-right { flex: 1; max-width: 400px; }
-        .auth-form-card { padding: var(--space-2xl); }
-        .auth-form-title {
-          font-size: var(--text-xl);
-          font-weight: 700;
-          margin-bottom: 4px;
-          letter-spacing: -0.01em;
-        }
-        .auth-form-subtitle {
-          color: var(--text-muted);
-          font-size: var(--text-sm);
-          margin-bottom: var(--space-xl);
-        }
-        .auth-user-info {
-          display: flex;
-          align-items: center;
-          gap: var(--space-sm);
-          padding: var(--space-sm) var(--space-md);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-muted);
-          border-radius: var(--radius-md);
-          font-size: var(--text-sm);
-          color: var(--accent-light);
-          margin-bottom: var(--space-md);
-        }
-        .input-with-icon {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-        .input-icon {
-          position: absolute;
-          left: 12px;
-          color: var(--text-muted);
-          pointer-events: none;
-          z-index: 1;
-        }
-        .input-field--icon { padding-left: 36px; }
-        .input-toggle {
-          position: absolute;
-          right: 8px;
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          padding: 4px;
-          display: flex;
-          z-index: 1;
-          transition: color var(--duration-fast);
-        }
-        .input-toggle:hover { color: var(--text-secondary); }
-        .password-strength {
-          display: flex;
-          align-items: center;
-          gap: var(--space-sm);
-          margin-top: 6px;
-        }
-        .password-strength__bar {
-          flex: 1;
-          height: 3px;
-          background: var(--bg-elevated);
-          border-radius: var(--radius-full);
-          overflow: hidden;
-        }
-        .password-strength__fill {
-          height: 100%;
-          border-radius: var(--radius-full);
-          transition: all var(--duration-normal) var(--ease-out);
-        }
-        .password-strength__label {
-          font-size: var(--text-xs);
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-        .auth-error {
-          padding: var(--space-sm) var(--space-md);
-          background: var(--danger-subtle);
-          border: 1px solid rgba(239, 68, 68, 0.2);
-          border-radius: var(--radius-md);
-          color: var(--danger);
-          font-size: var(--text-sm);
-          margin-bottom: var(--space-md);
-        }
-        .auth-submit {
-          width: 100%;
-          margin-top: var(--space-sm);
-        }
-        .auth-spinner {
-          width: 18px;
-          height: 18px;
-          border: 2px solid transparent;
-          border-top-color: currentColor;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .auth-switch {
-          text-align: center;
-          margin-top: var(--space-xl);
-          font-size: var(--text-sm);
-          color: var(--text-muted);
-        }
-        .auth-link {
-          background: none;
-          border: none;
-          color: var(--accent-light);
-          cursor: pointer;
-          font-size: inherit;
-          font-family: inherit;
-          font-weight: 500;
-        }
-        .auth-link:hover { color: var(--text-primary); text-decoration: underline; }
-        @media (max-width: 768px) {
-          .auth-container { flex-direction: column; gap: var(--space-xl); }
-          .auth-left { align-items: center; text-align: center; }
-          .auth-right { max-width: 100%; width: 100%; }
-          .auth-features { display: none; }
-        }
-      `}</style>
-    </div >
+                .auth-screen {
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #080b16; /* Midnight base */
+                    color: white;
+                    font-family: 'Outfit', sans-serif;
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                /* Aurora Background */
+                .aurora-bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; }
+                .aurora-blob {
+                    position: absolute;
+                    filter: blur(80px);
+                    opacity: 0.4;
+                    animation: float 20s infinite ease-in-out;
+                }
+                .blob-1 { width: 50vw; height: 50vw; background: #6366f1; top: -20%; left: -10%; animation-delay: 0s; }
+                .blob-2 { width: 40vw; height: 40vw; background: #a855f7; bottom: -10%; right: -10%; animation-delay: -5s; }
+                .blob-3 { width: 30vw; height: 30vw; background: #40c4ff; top: 40%; left: 30%; animation-delay: -10s; }
+
+                @keyframes float {
+                    0%, 100% { transform: translate(0, 0); }
+                    50% { transform: translate(30px, -30px) scale(1.1); }
+                }
+
+                .auth-container {
+                    position: relative;
+                    z-index: 10;
+                    width: 100%;
+                    max-width: 420px;
+                    padding: 20px;
+                }
+
+                .auth-card {
+                    background: rgba(15, 23, 42, 0.6);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 24px;
+                    padding: 40px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                    animation: scaleIn 0.4s ease-out;
+                }
+
+                @keyframes scaleIn {
+                    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
+                }
+
+                .auth-header { text-align: center; margin-bottom: 30px; }
+                .logo-icon {
+                    width: 56px; height: 56px;
+                    background: linear-gradient(135deg, #6366f1, #a855f7);
+                    border-radius: 16px;
+                    display: flex; align-items: center; justify-content: center;
+                    margin: 0 auto 16px;
+                    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+                }
+                .app-title { font-size: 24px; font-weight: 700; background: linear-gradient(to right, #fff, #a5b4fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+                .app-tagline { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+
+                .auth-mode-title { font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 24px; color: white; }
+
+                .input-group { margin-bottom: 16px; }
+                .input-group label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; font-weight: 500; }
+                .input-field {
+                    position: relative;
+                    display: flex; align-items: center;
+                }
+                .input-field input {
+                    width: 100%;
+                    background: rgba(30, 41, 59, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    padding: 12px 16px 12px 42px;
+                    border-radius: 12px;
+                    color: white;
+                    font-size: 15px;
+                    transition: all 0.2s;
+                    outline: none;
+                }
+                .input-field input:focus {
+                    background: rgba(30, 41, 59, 0.8);
+                    border-color: #6366f1;
+                    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+                }
+                .input-field .icon {
+                    position: absolute; left: 14px; color: #94a3b8; pointer-events: none;
+                }
+                .toggle-pwd {
+                    position: absolute; right: 12px; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px;
+                }
+                .toggle-pwd:hover { color: white; }
+
+                .forgot-link { text-align: right; margin-bottom: 20px; }
+                .forgot-link button { background: none; border: none; color: #818cf8; font-size: 13px; cursor: pointer; font-weight: 500; }
+                .forgot-link button:hover { color: #a5b4fc; text-decoration: underline; }
+
+                .submit-btn {
+                    width: 100%;
+                    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                    border: none;
+                    padding: 14px;
+                    border-radius: 12px;
+                    color: white;
+                    font-size: 16px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
+                    transition: transform 0.1s, box-shadow 0.2s;
+                }
+                .submit-btn:hover {
+                    box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
+                    transform: translateY(-1px);
+                }
+                .submit-btn:active { transform: translateY(0); }
+                .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+                .auth-footer { margin-top: 24px; text-align: center; font-size: 14px; color: #94a3b8; }
+                .auth-footer button { background: none; border: none; color: #38bdf8; font-weight: 600; cursor: pointer; margin-left: 4px; }
+                .auth-footer button:hover { color: #7dd3fc; }
+
+                .feedback {
+                    padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 10px;
+                }
+                .feedback.error { background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); }
+                .feedback.success { background: rgba(34, 197, 94, 0.1); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.2); }
+
+                .spinner {
+                    width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+
+                @media (max-width: 480px) {
+                    .auth-card { padding: 30px 20px; }
+                }
+            `}</style>
+    </div>
   );
 }

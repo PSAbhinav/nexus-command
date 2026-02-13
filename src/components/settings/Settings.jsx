@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
 import { exportAllData, importData } from '../../utils/storage';
-import { changePassword, deleteAccount, getPasswordStrength } from '../../utils/encryption';
+import { getPasswordStrength } from '../../utils/encryption'; // Keeping strength meter for UI
 import { Download, Upload, Key, Trash2, Globe, Shield, X, Palette, Type, Layout, Sparkles } from 'lucide-react';
 
 const ACCENT_COLORS = [
@@ -58,16 +58,29 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
         reader.readAsText(file);
     };
 
-    const handleChangePwd = (e) => {
+    const handleChangePwd = async (e) => {
         e.preventDefault();
         if (newPwd.length < 8) { setMsg({ text: 'Password must be at least 8 characters.', type: 'error' }); return; }
         if (newPwd !== confirmPwd) { setMsg({ text: 'Passwords do not match.', type: 'error' }); return; }
-        const result = changePassword(oldPwd, newPwd);
-        if (result) { setMsg({ text: 'Password changed! Please re-login.', type: 'success' }); setShowPwdChange(false); setTimeout(onLock, 1500); }
-        else setMsg({ text: 'Current password is incorrect.', type: 'error' });
+
+        const { error } = await supabase.auth.updateUser({ password: newPwd });
+
+        if (!error) {
+            setMsg({ text: 'Password changed! Please re-login on other devices.', type: 'success' });
+            setShowPwdChange(false);
+        } else {
+            setMsg({ text: error.message, type: 'error' });
+        }
     };
 
-    const handleDelete = () => { deleteAccount(); window.location.reload(); };
+    const handleDelete = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('user_data').delete().eq('user_id', user.id);
+            await supabase.auth.signOut();
+            window.location.reload();
+        }
+    };
     const strength = getPasswordStrength(newPwd);
 
     const currencies = [
@@ -221,7 +234,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                         <div className="modal__header"><h3 className="modal__title">Change Password</h3><button className="btn-icon" onClick={() => setShowPwdChange(false)}><X size={18} /></button></div>
                         <form onSubmit={handleChangePwd}>
                             <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                                <div className="input-group"><label className="input-label">Current Password</label><input type={showPwd ? 'text' : 'password'} className="input-field" value={oldPwd} onChange={e => setOldPwd(e.target.value)} required /></div>
+                                {/* Note: We don't verify old pwd client-side with Supabase, it handles security */}
                                 <div className="input-group"><label className="input-label">New Password</label><input type={showPwd ? 'text' : 'password'} className="input-field" value={newPwd} onChange={e => setNewPwd(e.target.value)} required />
                                     {newPwd && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}><div style={{ flex: 1, height: 3, background: 'var(--bg-elevated)', borderRadius: 99, overflow: 'hidden' }}><div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 99, transition: 'all 0.3s' }} /></div><span style={{ fontSize: 'var(--text-xs)', color: strength.color, fontWeight: 600, textTransform: 'uppercase' }}>{strength.level}</span></div>}
                                 </div>

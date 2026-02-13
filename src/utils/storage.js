@@ -1,4 +1,4 @@
-import { encrypt, decrypt } from './encryption';
+import { supabase } from '../lib/supabase';
 
 const DATA_KEYS = {
     finance: 'nexus_finance',
@@ -75,58 +75,81 @@ function getDefaultData() {
     };
 }
 
-export function loadData(module, encryptionKey) {
-    const key = DATA_KEYS[module];
-    if (!key) return null;
+export async function loadData(module) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return getDefaultData()[module];
 
-    const encrypted = localStorage.getItem(key);
-    if (!encrypted) {
-        const defaults = getDefaultData();
-        return defaults[module];
+    const { data, error } = await supabase
+        .from('user_data')
+        .select('data')
+        .eq('user_id', user.id)
+        .eq('module', module)
+        .single();
+
+    if (error || !data) {
+        return getDefaultData()[module];
     }
 
-    const decrypted = decrypt(encrypted, encryptionKey);
-    if (!decrypted) {
-        const defaults = getDefaultData();
-        return defaults[module];
-    }
-    return decrypted;
+    return data.data; // The JSON blob
 }
 
-export function saveData(module, data, encryptionKey) {
-    const key = DATA_KEYS[module];
-    if (!key) return;
+export async function saveData(module, dataToSave) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const encrypted = encrypt(data, encryptionKey);
-    localStorage.setItem(key, encrypted);
+    await supabase
+        .from('user_data')
+        .upsert({
+            user_id: user.id,
+            module: module,
+            data: dataToSave,
+            updated_at: new Date()
+        }, { onConflict: 'user_id, module' });
 }
 
-export function exportAllData(encryptionKey) {
+// Helper to load ALL modules at once (e.g. for Export)
+export async function exportAllData() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data } = await supabase
+        .from('user_data')
+        .select('module, data')
+        .eq('user_id', user.id);
+
     const allData = {};
-    Object.entries(DATA_KEYS).forEach(([module, key]) => {
-        const encrypted = localStorage.getItem(key);
-        if (encrypted) {
-            allData[module] = decrypt(encrypted, encryptionKey);
-        }
-    });
+    if (data) {
+        data.forEach(row => {
+            allData[row.module] = row.data;
+        });
+    }
 
     return {
-        version: '1.0.0',
+        version: '2.0.0', // Cloud version
         exportedAt: new Date().toISOString(),
         data: allData
     };
 }
 
-export function importData(jsonData, encryptionKey) {
+// Helper for Import
+export async function importData(jsonData) {
     if (!jsonData || !jsonData.data) return false;
 
-    Object.entries(jsonData.data).forEach(([module, data]) => {
-        if (DATA_KEYS[module] && data) {
-            saveData(module, data, encryptionKey);
-        }
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
 
-    return true;
+    const updates = Object.entries(jsonData.data).map(([module, data]) => ({
+        user_id: user.id,
+        module,
+        data,
+        updated_at: new Date()
+    }));
+
+    const { error } = await supabase
+        .from('user_data')
+        .upsert(updates, { onConflict: 'user_id, module' });
+
+    return !error;
 }
 
 export function generateId() {
@@ -146,3 +169,4 @@ export function formatCurrency(amount, symbol = '$') {
 export function getTodayKey() {
     return new Date().toISOString().split('T')[0];
 }
+
