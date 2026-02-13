@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { setupAccount, verifyPassword, hasAccount, getAccountEmail, getPasswordStrength } from '../../utils/encryption';
+import { setupAccount, verifyPassword, hasAccount, getAccountEmail, getPasswordStrength, deleteAccount } from '../../utils/encryption';
 import { Shield, Eye, EyeOff, Lock, Mail, ArrowRight, BarChart3, Target, Zap, Heart } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
@@ -37,7 +37,29 @@ export default function AuthScreen({ onAuthenticated }) {
             onAuthenticated(key);
             setLoading(false);
         }, 500);
+    const handleRegister = useCallback((e) => {
+        e.preventDefault();
+        setError('');
+        if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
+        if (password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
+        if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+        setLoading(true);
+        setTimeout(() => {
+            const key = setupAccount(email, password);
+            onAuthenticated(key);
+            setLoading(false);
+        }, 500);
     }, [email, password, confirmPassword, onAuthenticated]);
+
+    const handleReset = useCallback(() => {
+        if (window.confirm('Are you sure? This will DELETE ALL DATA permanently. You cannot undo this.')) {
+            deleteAccount();
+            setMode('register');
+            setEmail('');
+            setPassword('');
+            setError('');
+        }
+    }, []);
 
     const features = [
         { icon: <BarChart3 size={18} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
@@ -139,6 +161,13 @@ export default function AuthScreen({ onAuthenticated }) {
                                 ? <span>No account? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create one</button></span>
                                 : <span>Already have an account? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Sign in</button></span>
                             }
+                            {mode === 'login' && (
+                                <div style={{ marginTop: 'var(--space-md)' }}>
+                                    <button className="auth-link" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }} onClick={handleReset}>
+                                        Reset Vault / Forgot Password?
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
