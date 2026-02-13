@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Shield, Mail, ArrowRight, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Zap, Globe, BarChart3, Cloud } from 'lucide-react';
+import { Shield, Mail, ArrowRight, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, BarChart3, Zap, Target, Heart, Layout } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'reset'
@@ -84,10 +84,12 @@ export default function AuthScreen({ onAuthenticated }) {
     }
   };
 
-  const features = [
-    { icon: <Cloud size={20} />, title: 'Cloud Sync', desc: 'Access your command center from any device.' },
-    { icon: <Shield size={20} />, title: 'Bank-Grade Security', desc: 'End-to-end encryption for your private data.' },
-    { icon: <BarChart3 size={20} />, title: 'Advanced Analytics', desc: 'Visualize your life with powerful metrics.' }
+  // Original modules list from generic previous design
+  const modules = [
+    { icon: <BarChart3 size={20} />, title: 'Finance Tracker', desc: 'Budgets, expenses & insights' },
+    { icon: <Target size={20} />, title: 'Goals & Habits', desc: 'Track streaks & milestones' },
+    { icon: <Zap size={20} />, title: 'Productivity', desc: 'Tasks, focus timer & more' },
+    { icon: <Heart size={20} />, title: 'Health Metrics', desc: 'Wellness & fitness tracking' }
   ];
 
   return (
@@ -99,23 +101,23 @@ export default function AuthScreen({ onAuthenticated }) {
       </div>
 
       <div className="auth-container">
-        {/* Left Side - Branding & Features */}
+        {/* Left Side - Module Showcase (Restored from Previous Design) */}
         <div className="auth-left">
           <div className="brand-header">
             <div className="logo-icon"><Shield size={32} /></div>
             <div>
               <h1 className="app-title">NexusCommand</h1>
-              <p className="app-tagline">Secure Cloud Workspace</p>
+              <p className="app-tagline">Your cloud-synced personal command center</p>
             </div>
           </div>
 
-          <div className="feature-list">
-            {features.map((f, i) => (
-              <div key={i} className="feature-item">
-                <div className="feature-icon">{f.icon}</div>
+          <div className="module-list">
+            {modules.map((m, i) => (
+              <div key={i} className="module-item">
+                <div className="module-icon">{m.icon}</div>
                 <div>
-                  <div className="feature-title">{f.title}</div>
-                  <div className="feature-desc">{f.desc}</div>
+                  <div className="module-title">{m.title}</div>
+                  <div className="module-desc">{m.desc}</div>
                 </div>
               </div>
             ))}
@@ -136,6 +138,8 @@ export default function AuthScreen({ onAuthenticated }) {
               {mode === 'reset' && 'Set New Password'}
             </h2>
 
+            {mode === 'login' && <p className="auth-subtitle">Enter your credentials to access your dashboard</p>}
+
             {error && <div className="feedback error"><AlertCircle size={16} />{error}</div>}
             {successMsg && <div className="feedback success"><CheckCircle2 size={16} />{successMsg}</div>}
 
@@ -143,9 +147,16 @@ export default function AuthScreen({ onAuthenticated }) {
               {(mode === 'login' || mode === 'register' || mode === 'forgot') && (
                 <div className="input-group">
                   <label>Email Address</label>
-                  <div className="input-field">
-                    <Mail size={18} className="icon" />
-                    <input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={mode === 'login'} />
+                  <div className="simple-input-wrapper">
+                    <Mail size={18} className="input-icon" />
+                    <input
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      required
+                      autoFocus={mode === 'login'}
+                    />
                   </div>
                 </div>
               )}
@@ -153,9 +164,15 @@ export default function AuthScreen({ onAuthenticated }) {
               {(mode === 'login' || mode === 'register' || mode === 'reset') && (
                 <div className="input-group">
                   <label>{mode === 'reset' ? 'New Password' : 'Password'}</label>
-                  <div className="input-field">
-                    <Lock size={18} className="icon" />
-                    <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <div className="simple-input-wrapper">
+                    <Lock size={18} className="input-icon" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                    />
                     <button type="button" className="toggle-pwd" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -166,9 +183,15 @@ export default function AuthScreen({ onAuthenticated }) {
               {(mode === 'register' || mode === 'reset') && (
                 <div className="input-group">
                   <label>Confirm Password</label>
-                  <div className="input-field">
-                    <Lock size={18} className="icon" />
-                    <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+                  <div className="simple-input-wrapper">
+                    <Lock size={18} className="input-icon" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                    />
                   </div>
                 </div>
               )}
@@ -231,26 +254,26 @@ export default function AuthScreen({ onAuthenticated }) {
                     50% { transform: translate(30px, -30px) scale(1.1); }
                 }
 
-                /* Split Layout Container */
                 .auth-container {
                     position: relative;
                     z-index: 10;
                     display: flex;
                     width: 100%;
-                    max-width: 900px; /* Wider for split */
-                    gap: 60px;
+                    max-width: 900px;
+                    gap: 80px;
                     align-items: center;
+                    justify-content: center;
                 }
 
-                /* Left Side */
+                /* Left Side - Modules List */
                 .auth-left {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    gap: 40px;
+                    gap: 30px;
                 }
 
-                .brand-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+                .brand-header { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
                 .logo-icon {
                     width: 48px; height: 48px;
                     background: linear-gradient(135deg, #6366f1, #a855f7);
@@ -259,28 +282,36 @@ export default function AuthScreen({ onAuthenticated }) {
                     box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
                 }
                 .app-title { font-size: 28px; font-weight: 700; color: white; margin: 0; line-height: 1.2; }
-                .app-tagline { color: #94a3b8; font-size: 14px; margin: 0; }
+                .app-tagline { color: #94a3b8; font-size: 14px; margin: 4px 0 0 0; }
 
-                .feature-list { display: flex; flex-direction: column; gap: 24px; }
-                .feature-item { display: flex; gap: 16px; }
-                .feature-icon {
-                    width: 40px; height: 40px;
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 10px;
+                .module-list { display: flex; flex-direction: column; gap: 16px; }
+                .module-item { 
+                    display: flex; gap: 16px; align-items: center;
+                    padding: 12px;
+                    border-radius: 12px;
+                    background: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    transition: transform 0.2s;
+                }
+                .module-item:hover { transform: translateX(5px); background: rgba(255, 255, 255, 0.06); }
+
+                .module-icon {
+                    width: 36px; height: 36px;
+                    background: rgba(99, 102, 241, 0.1);
+                    border-radius: 8px;
                     display: flex; align-items: center; justify-content: center;
                     color: #a5b4fc;
                     flex-shrink: 0;
                 }
-                .feature-title { font-weight: 600; font-size: 15px; color: white; margin-bottom: 4px; }
-                .feature-desc { font-size: 13px; color: #94a3b8; line-height: 1.4; }
+                .module-title { font-weight: 600; font-size: 15px; color: white; }
+                .module-desc { font-size: 13px; color: #94a3b8; }
 
-                .auth-footer-note { font-size: 12px; color: #64748b; margin-top: auto; }
+                .auth-footer-note { font-size: 12px; color: #64748b; margin-top: 20px; }
 
-                /* Right Side */
+                /* Right Side - Form */
                 .auth-right {
                     flex: 1;
-                    max-width: 420px;
+                    max-width: 400px;
                 }
 
                 .auth-card {
@@ -298,57 +329,87 @@ export default function AuthScreen({ onAuthenticated }) {
                     to { opacity: 1; transform: translateY(0); }
                 }
 
-                .auth-mode-title { font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 24px; color: white; }
+                .auth-mode-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; color: white; }
+                .auth-subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
 
+                /* Simplified Inputs - No 'box in box' */
                 .input-group { margin-bottom: 16px; }
-                .input-group label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; font-weight: 500; }
-                .input-field { position: relative; display: flex; align-items: center; }
-                .input-field input {
+                .input-group label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+                
+                .simple-input-wrapper {
+                    position: relative;
+                }
+                
+                .simple-input-wrapper input {
                     width: 100%;
-                    background: rgba(30, 41, 59, 0.5);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    padding: 12px 16px 12px 42px;
-                    border-radius: 12px;
+                    background: rgba(15, 23, 42, 0.8);
+                    border: 1px solid rgba(51, 65, 85, 1);
+                    padding: 12px 16px 12px 40px; /* Space for icon */
+                    border-radius: 8px;
                     color: white;
                     font-size: 15px;
                     transition: all 0.2s;
                     outline: none;
                 }
-                .input-field input:focus {
-                    background: rgba(30, 41, 59, 0.8);
+                
+                .simple-input-wrapper input:focus {
                     border-color: #6366f1;
                     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+                    background: rgba(30, 41, 59, 1);
                 }
-                .input-field .icon { position: absolute; left: 14px; color: #94a3b8; pointer-events: none; }
-                .toggle-pwd { position: absolute; right: 12px; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; }
-                .toggle-pwd:hover { color: white; }
 
-                .forgot-link { text-align: right; margin-bottom: 20px; }
-                .forgot-link button { background: none; border: none; color: #818cf8; font-size: 13px; cursor: pointer; font-weight: 500; }
-                .forgot-link button:hover { color: #a5b4fc; text-decoration: underline; }
+                .input-icon {
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: #64748b;
+                    pointer-events: none;
+                    transition: color 0.2s;
+                }
+                
+                .simple-input-wrapper input:focus + .input-icon {
+                    color: #818cf8;
+                }
+                /* Use sibling selector hack or just rely on focus-within if we wrapper */
+
+                .toggle-pwd {
+                    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                    background: none; border: none; color: #64748b; cursor: pointer; padding: 4px;
+                }
+                .toggle-pwd:hover { color: #white; }
+
+                .forgot-link { text-align: right; margin-bottom: 24px; }
+                .forgot-link button { background: none; border: none; color: #2dd4bf; /* Teal accent */ font-size: 13px; cursor: pointer; font-weight: 500; }
+                .forgot-link button:hover { color: #5eead4; text-decoration: underline; }
 
                 .submit-btn {
                     width: 100%;
-                    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                    background: linear-gradient(135deg, #6366f1, #8b5cf6);
                     border: none;
                     padding: 14px;
-                    border-radius: 12px;
+                    border-radius: 8px;
                     color: white;
                     font-size: 16px;
                     font-weight: 600;
                     cursor: pointer;
                     display: flex; align-items: center; justify-content: center; gap: 8px;
                     transition: transform 0.1s, box-shadow 0.2s;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                 }
-                .submit-btn:hover { box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4); transform: translateY(-1px); }
+                .submit-btn:hover {
+                    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+                    transform: translateY(-1px);
+                    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                }
                 .submit-btn:active { transform: translateY(0); }
                 .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
                 .auth-footer-switch { margin-top: 24px; text-align: center; font-size: 14px; color: #94a3b8; }
-                .auth-footer-switch button { background: none; border: none; color: #38bdf8; font-weight: 600; cursor: pointer; margin-left: 4px; }
-                .auth-footer-switch button:hover { color: #7dd3fc; }
+                .auth-footer-switch button { background: none; border: none; color: #818cf8; font-weight: 600; cursor: pointer; margin-left: 4px; }
+                .auth-footer-switch button:hover { color: #a5b4fc; }
 
-                .feedback { padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+                .feedback { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
                 .feedback.error { background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); }
                 .feedback.success { background: rgba(34, 197, 94, 0.1); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.2); }
 
@@ -358,10 +419,10 @@ export default function AuthScreen({ onAuthenticated }) {
                 /* Mobile Responsive */
                 @media (max-width: 900px) {
                     .auth-container { flex-direction: column; gap: 40px; }
-                    .auth-left { text-align: center; align-items: center; }
+                    .auth-left { order: 2; text-align: center; align-items: center; } 
+                    .module-list { display: none; }
+                    .auth-right { order: 1; width: 100%; }
                     .brand-header { justify-content: center; }
-                    .feature-list { display: none; /* Hide features on mobile like old design */ }
-                    .auth-right { width: 100%; }
                 }
             `}</style>
     </div>
