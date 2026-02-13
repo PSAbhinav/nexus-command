@@ -118,7 +118,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                             {ACCENT_COLORS.map(c => (
                                 <button
                                     key={c.id}
-                                    className={`color-swatch ${settings?.accentColor === c.id ? 'color-swatch--active' : ''}`}
+                                    className={`color-swatch ${(settings?.accentColor || 'teal') === c.id ? 'color-swatch--active' : ''}`}
                                     style={{ '--swatch-color': c.color }}
                                     onClick={() => update('accentColor', c.id)}
                                     title={c.label}
@@ -140,7 +140,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                         </div>
                         <div className="option-chips">
                             {FONT_SIZES.map(f => (
-                                <button key={f.id} className={`option-chip ${settings?.fontSize === f.id ? 'option-chip--active' : ''}`} onClick={() => update('fontSize', f.id)}>
+                                <button key={f.id} className={`option-chip ${(settings?.fontSize || 'default') === f.id ? 'option-chip--active' : ''}`} onClick={() => update('fontSize', f.id)}>
                                     <span className="option-chip__label">{f.label}</span>
                                     <span className="option-chip__desc">{f.desc}</span>
                                 </button>
@@ -156,7 +156,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                         </div>
                         <div className="option-chips">
                             {['left', 'right'].map(p => (
-                                <button key={p} className={`option-chip ${settings?.sidebarPosition === p ? 'option-chip--active' : ''}`} onClick={() => update('sidebarPosition', p)}>
+                                <button key={p} className={`option-chip ${(settings?.sidebarPosition || 'left') === p ? 'option-chip--active' : ''}`} onClick={() => update('sidebarPosition', p)}>
                                     <Layout size={16} style={{ transform: p === 'right' ? 'scaleX(-1)' : 'none' }} />
                                     <span className="option-chip__label">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
                                 </button>
@@ -176,7 +176,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                         </div>
                         <div className="option-chips">
                             {ANIMATION_OPTS.map(a => (
-                                <button key={a.id} className={`option-chip ${settings?.animations === a.id ? 'option-chip--active' : ''}`} onClick={() => update('animations', a.id)}>
+                                <button key={a.id} className={`option-chip ${(settings?.animations || 'on') === a.id ? 'option-chip--active' : ''}`} onClick={() => update('animations', a.id)}>
                                     <span className="option-chip__label">{a.label}</span>
                                     <span className="option-chip__desc">{a.desc}</span>
                                 </button>

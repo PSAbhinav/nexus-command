@@ -39,6 +39,17 @@ const FONT_SCALES = {
   comfortable: 1.1
 };
 
+const DEFAULT_SETTINGS = {
+  theme: 'dark',
+  accentColor: 'teal',
+  fontSize: 'default',
+  animations: 'on',
+  sidebarPosition: 'left',
+  currency: 'INR',
+  currencySymbol: '₹',
+  autoLockMinutes: 15
+};
+
 export default function App() {
   const [encKey, setEncKey] = useState(null);
   const [activeModule, setActiveModule] = useState('dashboard');
@@ -133,8 +144,9 @@ export default function App() {
   if (!encKey) return <AuthScreen onAuthenticated={handleAuthenticated} />;
 
   const transitionClass = MODULE_TRANSITIONS[activeModule] || 'transition-cascade';
-  const sidebarRight = data.settings?.sidebarPosition === 'right';
-  const currentTheme = data.settings?.theme || 'dark';
+  const settings = data.settings || DEFAULT_SETTINGS;
+  const sidebarRight = settings.sidebarPosition === 'right';
+  const currentTheme = settings.theme || 'dark';
 
   const renderModule = () => {
     switch (activeModule) {
@@ -143,8 +155,8 @@ export default function App() {
       case 'tasks': return <TasksModule data={data.tasks} onUpdate={d => updateModule('tasks', d)} />;
       case 'health': return <HealthModule data={data.health} onUpdate={d => updateModule('health', d)} />;
       case 'goals': return <GoalsModule data={data.goals} onUpdate={d => updateModule('goals', d)} />;
-      case 'analytics': return <AnalyticsModule data={data} settings={data.settings} />;
-      case 'settings': return <SettingsModule settings={data.settings} onUpdateSettings={d => updateModule('settings', d)} encryptionKey={encKey} onLock={handleLock} />;
+      case 'analytics': return <AnalyticsModule data={data} settings={settings} />;
+      case 'settings': return <SettingsModule settings={settings} onUpdateSettings={d => updateModule('settings', d)} encryptionKey={encKey} onLock={handleLock} />;
       default: return <Dashboard data={data} settings={data.settings} onNavigate={switchModule} />;
     }
   };
