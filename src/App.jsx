@@ -183,9 +183,10 @@ export default function App() {
         }
         @media (max-width: 768px) {
           .app-main {
-            margin-left: var(--sidebar-collapsed) !important;
+            margin-left: 0 !important;
             margin-right: 0 !important;
             padding: var(--space-lg) var(--space-md);
+            padding-bottom: 100px;
           }
         }
       `}</style>

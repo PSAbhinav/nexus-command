@@ -230,8 +230,61 @@ export default function Sidebar({ activeModule, onModuleChange, onLock, collapse
           background: rgba(255, 255, 255, 0.03);
         }
         @media (max-width: 768px) {
-          .sidebar { width: var(--sidebar-collapsed) !important; left: 0 !important; right: auto !important; }
-          .sidebar__name, .sidebar__item span, .sidebar__theme-toggle { display: none; }
+          .sidebar {
+            width: 100% !important;
+            height: 64px;
+            top: auto;
+            bottom: 0;
+            left: 0 !important;
+            right: 0 !important;
+            flex-direction: row;
+            border-right: none;
+            border-top: 1px solid var(--border);
+            padding: 0 var(--space-sm);
+            justify-content: space-around;
+            align-items: center;
+          }
+          .sidebar__brand, .sidebar__footer { display: none; }
+          .sidebar__nav {
+            flex-direction: row;
+            padding: 0;
+            gap: 4px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            width: 100%;
+            justify-content: space-between;
+          }
+          .sidebar__item {
+            flex-direction: column;
+            justify-content: center;
+            padding: 8px;
+            gap: 4px;
+            border-radius: var(--radius-sm);
+            text-align: center;
+            width: auto;
+            flex: 1;
+          }
+          .sidebar__item svg { width: 20px; height: 20px; margin: 0 auto; }
+          .sidebar__item span {
+             display: block; /* Show label on mobile bottom nav if enough space, or hide if too cramped. Let's show small text. */
+             font-size: 10px;
+             line-height: 1;
+          }
+          .sidebar__logo { width: 24px; height: 24px; }
+          
+          /* Active indicator bottom bar style */
+          .sidebar[data-position="left"] .sidebar__item--active::before,
+          .sidebar[data-position="right"] .sidebar__item--active::before {
+            display: none;
+          }
+          .sidebar__item--active {
+            background: transparent;
+            color: var(--accent-light);
+          }
+          .sidebar__item--active svg {
+            filter: drop-shadow(0 0 8px var(--accent));
+            transform: translateY(-2px);
+          }
         }
       `}</style>
     </nav>
