@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useState, useRef } from 'react';
+import { auth, db } from '../../lib/firebase';
+import { updatePassword, signOut, deleteUser } from 'firebase/auth';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { exportAllData, importData } from '../../utils/storage';
 import { getPasswordStrength } from '../../utils/encryption'; // Keeping strength meter for UI
 import { Download, Upload, Key, Trash2, Globe, Shield, X, Palette, Type, Layout, Sparkles } from 'lucide-react';
@@ -64,22 +66,39 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
         if (newPwd.length < 8) { setMsg({ text: 'Password must be at least 8 characters.', type: 'error' }); return; }
         if (newPwd !== confirmPwd) { setMsg({ text: 'Passwords do not match.', type: 'error' }); return; }
 
-        const { error } = await supabase.auth.updateUser({ password: newPwd });
-
-        if (!error) {
-            setMsg({ text: 'Password changed! Please re-login on other devices.', type: 'success' });
-            setShowPwdChange(false);
-        } else {
+        try {
+            if (auth.currentUser) {
+                await updatePassword(auth.currentUser, newPwd);
+                setMsg({ text: 'Password changed! Please re-login on other devices.', type: 'success' });
+                setShowPwdChange(false);
+            } else {
+                setMsg({ text: 'You must be logged in to change your password.', type: 'error' });
+            }
+        } catch (error) {
             setMsg({ text: error.message, type: 'error' });
         }
     };
 
     const handleDelete = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = auth.currentUser;
         if (user) {
-            await supabase.from('user_data').delete().eq('user_id', user.id);
-            await supabase.auth.signOut();
-            window.location.reload();
+            try {
+                // Fetch and delete all user documents
+                const q = query(collection(db, 'user_data'), where('user_id', '==', user.uid));
+                const querySnapshot = await getDocs(q);
+                
+                const deletePromises = [];
+                querySnapshot.forEach((document) => {
+                    deletePromises.push(deleteDoc(doc(db, 'user_data', document.id)));
+                });
+                await Promise.all(deletePromises);
+
+                await deleteUser(user);
+                window.location.reload();
+            } catch (error) {
+                setMsg({ text: 'Failed to delete account. You may need to log in again first.', type: 'error' });
+                console.error("Error deleting user:", error);
+            }
         }
     };
     const strength = getPasswordStrength(newPwd);
@@ -235,7 +254,7 @@ export default function SettingsModule({ settings, onUpdateSettings, encryptionK
                         <div className="modal__header"><h3 className="modal__title">Change Password</h3><button className="btn-icon" onClick={() => setShowPwdChange(false)}><X size={18} /></button></div>
                         <form onSubmit={handleChangePwd}>
                             <div className="modal__body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                                {/* Note: We don't verify old pwd client-side with Supabase, it handles security */}
+                                {/* Note: We don't verify old pwd client-side with Firebase, it handles security */}
                                 <div className="input-group"><label className="input-label">New Password</label><input type={showPwd ? 'text' : 'password'} className="input-field" value={newPwd} onChange={e => setNewPwd(e.target.value)} required />
                                     {newPwd && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}><div style={{ flex: 1, height: 3, background: 'var(--bg-elevated)', borderRadius: 99, overflow: 'hidden' }}><div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 99, transition: 'all 0.3s' }} /></div><span style={{ fontSize: 'var(--text-xs)', color: strength.color, fontWeight: 600, textTransform: 'uppercase' }}>{strength.level}</span></div>}
                                 </div>

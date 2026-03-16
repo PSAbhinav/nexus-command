@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { auth } from '../../lib/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  updatePassword, 
+  confirmPasswordReset,
+  onAuthStateChanged 
+} from 'firebase/auth';
 import { Shield, Mail, ArrowRight, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, BarChart3, Zap, Target, Heart, Layout } from 'lucide-react';
 
 export default function AuthScreen({ onAuthenticated }) {
@@ -14,21 +22,25 @@ export default function AuthScreen({ onAuthenticated }) {
 
   // Check for password recovery flow
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setMode('reset');
-      }
-    });
+    const urlParams = new URLSearchParams(window.location.search);
+    const modeParam = urlParams.get('mode');
+    const oobCode = urlParams.get('oobCode');
+    if (modeParam === 'resetPassword' || oobCode) {
+      setMode('reset');
+    }
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(''); setSuccessMsg(''); setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) { setError(error.message); setLoading(false); }
-    else { onAuthenticated(data.user); }
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      onAuthenticated(userCredential.user);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
   };
 
   const handleRegister = async (e) => {
@@ -40,16 +52,12 @@ export default function AuthScreen({ onAuthenticated }) {
 
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
-
-    if (error) { setError(error.message); setLoading(false); }
-    else {
-      if (data.user && !data.session) {
-        setSuccessMsg('Registration successful! Please check your email to confirm your account.');
-        setLoading(false);
-      } else {
-        onAuthenticated(data.user);
-      }
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      onAuthenticated(userCredential.user);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
     }
   };
 
@@ -58,12 +66,14 @@ export default function AuthScreen({ onAuthenticated }) {
     if (!email) { setError('Please enter your email address.'); return; }
     setLoading(true); setError(''); setSuccessMsg('');
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-
-    if (error) { setError(error.message); }
-    else { setSuccessMsg('Password reset link sent! Check your inbox (valid for 5 mins).'); }
+    try {
+      await sendPasswordResetEmail(auth, email, {
+        url: window.location.origin
+      });
+      setSuccessMsg('Password reset link sent! Check your inbox.');
+    } catch (err) {
+      setError(err.message);
+    }
     setLoading(false);
   };
 
@@ -74,14 +84,28 @@ export default function AuthScreen({ onAuthenticated }) {
 
     setLoading(true); setError('');
 
-    const { error } = await supabase.auth.updateUser({ password });
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const oobCode = urlParams.get('oobCode');
 
-    if (error) { setError(error.message); setLoading(false); }
-    else {
-      setSuccessMsg('Password updated successfully! You can now log in.');
-      setTimeout(() => { setMode('login'); setPassword(''); setConfirmPassword(''); setSuccessMsg(''); }, 2000);
-      setLoading(false);
+      if (oobCode) {
+        await confirmPasswordReset(auth, oobCode, password);
+        setSuccessMsg('Password updated successfully! You can now log in.');
+        setTimeout(() => { 
+          setMode('login'); setPassword(''); setConfirmPassword(''); setSuccessMsg(''); 
+          window.history.replaceState({}, document.title, window.location.pathname); 
+        }, 2000);
+      } else if (auth.currentUser) {
+        await updatePassword(auth.currentUser, password);
+        setSuccessMsg('Password updated successfully! You can now log in.');
+        setTimeout(() => { setMode('login'); setPassword(''); setConfirmPassword(''); setSuccessMsg(''); }, 2000);
+      } else {
+        setError('Invalid password reset link.');
+      }
+    } catch (err) {
+      setError(err.message);
     }
+    setLoading(false);
   };
 
   // Original modules list from generic previous design

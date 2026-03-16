@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { hasAccount } from './utils/encryption';
 import { loadData, saveData } from './utils/storage';
+import { auth } from './lib/firebase';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import AuthScreen from './components/auth/AuthScreen';
 import Sidebar from './components/layout/Sidebar';
 import Dashboard from './components/layout/Dashboard';
@@ -59,13 +61,24 @@ export default function App() {
   const activityTimer = useRef(null);
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setEncKey(user); // Using user object as the "encKey" for now
+      } else {
+        setEncKey(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (!encKey) return;
     setData({
-      finance: loadData('finance', encKey),
-      tasks: loadData('tasks', encKey),
-      health: loadData('health', encKey),
-      goals: loadData('goals', encKey),
-      settings: loadData('settings', encKey)
+      finance: loadData('finance'),
+      tasks: loadData('tasks'),
+      health: loadData('health'),
+      goals: loadData('goals'),
+      settings: loadData('settings')
     });
   }, [encKey]);
 
@@ -128,8 +141,15 @@ export default function App() {
     saveData(module, newData, encKey);
   }, [encKey]);
 
-  const handleLock = useCallback(() => setEncKey(null), []);
-  const handleAuthenticated = useCallback((key) => { setEncKey(key); setActiveModule('dashboard'); }, []);
+  const handleLock = useCallback(async () => {
+    await signOut(auth);
+    setEncKey(null);
+  }, []);
+
+  const handleAuthenticated = useCallback((user) => { 
+    setEncKey(user); 
+    setActiveModule('dashboard'); 
+  }, []);
 
   const switchModule = useCallback((mod) => {
     setTransitionKey(k => k + 1);

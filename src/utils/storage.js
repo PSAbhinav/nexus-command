@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc, setDoc, query, collection, where, getDocs, writeBatch } from 'firebase/firestore';
 const DATA_KEYS = {
     finance: 'nexus_finance',
     tasks: 'nexus_tasks',
@@ -76,80 +76,93 @@ function getDefaultData() {
 }
 
 export async function loadData(module) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return getDefaultData()[module];
 
-    const { data, error } = await supabase
-        .from('user_data')
-        .select('data')
-        .eq('user_id', user.id)
-        .eq('module', module)
-        .single();
+    try {
+        const docRef = doc(db, 'user_data', `${user.uid}_${module}`);
+        const docSnap = await getDoc(docRef);
 
-    if (error || !data) {
+        if (docSnap.exists() && docSnap.data().data) {
+            return docSnap.data().data;
+        } else {
+            return getDefaultData()[module];
+        }
+    } catch (error) {
+        console.error("Error loading data:", error);
         return getDefaultData()[module];
     }
-
-    return data.data; // The JSON blob
 }
 
 export async function saveData(module, dataToSave) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
 
-    await supabase
-        .from('user_data')
-        .upsert({
-            user_id: user.id,
+    try {
+        const docRef = doc(db, 'user_data', `${user.uid}_${module}`);
+        await setDoc(docRef, {
+            user_id: user.uid,
             module: module,
             data: dataToSave,
             updated_at: new Date()
-        }, { onConflict: 'user_id, module' });
+        }, { merge: true });
+    } catch (error) {
+        console.error("Error saving data:", error);
+    }
 }
 
 // Helper to load ALL modules at once (e.g. for Export)
 export async function exportAllData() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return null;
 
-    const { data } = await supabase
-        .from('user_data')
-        .select('module, data')
-        .eq('user_id', user.id);
+    try {
+        const q = query(collection(db, 'user_data'), where('user_id', '==', user.uid));
+        const querySnapshot = await getDocs(q);
 
-    const allData = {};
-    if (data) {
-        data.forEach(row => {
+        const allData = {};
+        querySnapshot.forEach(doc => {
+            const row = doc.data();
             allData[row.module] = row.data;
         });
-    }
 
-    return {
-        version: '2.0.0', // Cloud version
-        exportedAt: new Date().toISOString(),
-        data: allData
-    };
+        return {
+            version: '2.0.0', // Cloud version
+            exportedAt: new Date().toISOString(),
+            data: allData
+        };
+    } catch (error) {
+        console.error("Error exporting data:", error);
+        return null;
+    }
 }
 
 // Helper for Import
 export async function importData(jsonData) {
     if (!jsonData || !jsonData.data) return false;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return false;
 
-    const updates = Object.entries(jsonData.data).map(([module, data]) => ({
-        user_id: user.id,
-        module,
-        data,
-        updated_at: new Date()
-    }));
+    try {
+        const batch = writeBatch(db);
+        
+        Object.entries(jsonData.data).forEach(([module, data]) => {
+            const docRef = doc(db, 'user_data', `${user.uid}_${module}`);
+            batch.set(docRef, {
+                user_id: user.uid,
+                module: module,
+                data: data,
+                updated_at: new Date() // Not setting this as 'updated_at: ServerValue.TIMESTAMP' but js Date works
+            }, { merge: true });
+        });
 
-    const { error } = await supabase
-        .from('user_data')
-        .upsert(updates, { onConflict: 'user_id, module' });
-
-    return !error;
+        await batch.commit();
+        return true;
+    } catch (error) {
+        console.error("Error importing data:", error);
+        return false;
+    }
 }
 
 export function generateId() {
