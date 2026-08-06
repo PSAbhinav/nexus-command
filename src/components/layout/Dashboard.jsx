@@ -1,3 +1,4 @@
+// cmd-agent[run-1-51vb] edit.implement: edit Dashboard: abhinav-7391-was-here
 import { formatCurrency, getTodayKey } from '../../utils/storage';
 import { Wallet, CheckSquare, Target, Heart, ArrowUpRight, ArrowRight, Clock } from 'lucide-react';
 import useAnimatedValue from '../../hooks/useAnimatedValue';
