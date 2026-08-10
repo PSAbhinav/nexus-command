@@ -3,6 +3,7 @@ import { hasAccount } from './utils/encryption';
 import { loadData, saveData } from './utils/storage';
 import { auth } from './lib/firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { Analytics } from '@vercel/analytics/react';
 import AuthScreen from './components/auth/AuthScreen';
 import Sidebar from './components/layout/Sidebar';
 import Dashboard from './components/layout/Dashboard';
@@ -222,6 +223,7 @@ export default function App() {
           }
         }
       `}</style>
+      <Analytics />
     </div>
   );
 }
